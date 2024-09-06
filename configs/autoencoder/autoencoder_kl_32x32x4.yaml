@@ -26,18 +26,20 @@ model:
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 12
+    batch_size: 3
     wrap: True
     train:
-      target: ldm.data.imagenet.ImageNetSRTrain
+      target: ldm.data.vs.VsDatasetTrain
       params:
-        size: 256
-        degradation: pil_nearest
+        img_size: [480, 640]
+        data_root: "../data/real_world_data_4"
+        train_flist: "train.flist"
     validation:
-      target: ldm.data.imagenet.ImageNetSRValidation
+      target: ldm.data.vs.VsDatasetVal
       params:
-        size: 256
-        degradation: pil_nearest
+        data_root: "../data/real_world_data_4"
+        img_size: [480, 640]
+        val_flist: "val.flist"
 
 lightning:
   callbacks:

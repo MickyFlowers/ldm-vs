@@ -1,0 +1,39 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "inpaint",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "scripts/inpaint.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--indir",
+                "data/inpainting_examples/",
+                "--outdir",
+                "outputs/inpainting_results",
+            ],
+        },
+        {
+            "name": "main",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "./main.py",
+            "console": "integratedTerminal",
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "0"
+            },
+            "args": [
+                "--base",
+                "configs/autoencoder/autoencoder_kl_32x32x4.yaml",
+                "-t",
+                "--gpus",
+                "0",
+            ],
+        },
+    ]
+}
