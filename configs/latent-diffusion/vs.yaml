@@ -1,0 +1,129 @@
+model:
+  base_learning_rate: 1.0e-06
+  target: ldm.models.diffusion.ddpm.LatentDiffusion
+  params:
+    linear_start: 0.00085
+    linear_end: 0.012
+    log_every_t: 100
+    timesteps: 1000
+    loss_type: l1
+    first_stage_key: image
+    cond_stage_key: segmentation
+    image_size: [60, 80]
+    channels: 8
+    concat_mode: true
+    monitor: val/loss
+    scheduler_config:
+      target: ldm.lr_scheduler.LambdaWarmUpCosineScheduler
+      params:
+        verbosity_interval: 0
+        warm_up_steps: 1000
+        max_decay_steps: 50000
+        lr_start: 0.001
+        lr_max: 0.1
+        lr_min: 0.0001
+    unet_config:
+      target: ldm.modules.diffusionmodules.openaimodel.UNetModel
+      params:
+        image_size: [60, 80]
+        in_channels: 16
+        out_channels: 8
+        model_channels: 256
+        attention_resolutions:
+        - 8
+        - 4
+        - 2
+        num_res_blocks: 3
+        channel_mult:
+        - 1
+        - 2
+        - 4
+        num_heads: 8
+        resblock_updown: true
+
+    first_stage_config:
+      target: ldm.models.autoencoder.AutoencoderKL
+      params:
+        embed_dim: 8
+        monitor: val/rec_loss
+        # TODO
+        ckpt_path: logs/2024-09-20T07-52-18_vs_img/checkpoints/epoch=000033.ckpt
+        lossconfig:
+          target: ldm.modules.losses.LPIPSWithDiscriminator
+          params:
+            disc_start: 5000
+            kl_weight: 1
+            disc_weight: 0.5
+
+        ddconfig:
+          double_z: True
+          z_channels: 8
+          resolution: [480, 640]
+          in_channels: 3
+          out_ch: 3
+          ch: 128
+          ch_mult: [1,2,4,8]  # num_down = len(ch_mult)-1
+          num_res_blocks: 3
+          attn_resolutions: [[60, 80]]
+          dropout: 0.0
+
+    cond_stage_config: 
+      target: ldm.models.autoencoder.AutoencoderKL
+      params:
+        embed_dim: 8
+        monitor: val/rec_loss
+        # TODO
+        ckpt_path: logs/2024-09-22T12-12-26_vs_seg/checkpoints/epoch=000040.ckpt
+        lossconfig:
+          target: ldm.modules.losses.LPIPSWithDiscriminator
+          params:
+            disc_start: 5000
+            kl_weight: 1
+            disc_weight: 0.5
+
+        ddconfig:
+          double_z: True
+          z_channels: 8
+          resolution: [480, 640]
+          in_channels: 3
+          out_ch: 3
+          ch: 128
+          ch_mult: [1,2,4,8]  # num_down = len(ch_mult)-1
+          num_res_blocks: 3
+          attn_resolutions: [[60, 80]]
+          dropout: 0.0
+
+
+data:
+  target: main.DataModuleFromConfig
+  params:
+    batch_size: 12
+    wrap: True
+    num_workers: 4
+    train:
+      target: ldm.data.vs.VsDatasetTrain
+      params:
+        seg: False
+        img_size: [480, 640]
+        data_root: "/yuxi/data/vs/real_world_data_4"
+        train_flist: "train.flist"
+    validation:
+      target: ldm.data.vs.VsDatasetVal
+      params:
+        seg: False
+        data_root: "/yuxi/data/vs/real_world_data_4"
+        img_size: [480, 640]
+        val_flist: "val.flist"
+
+lightning:
+  callbacks:
+    image_logger:
+      target: main.ImageLogger
+      params:
+        train_batch_frequency: 5000
+        val_batch_frequency: 500
+        max_images: 8
+        increase_log_steps: False
+
+  trainer:
+    benchmark: True

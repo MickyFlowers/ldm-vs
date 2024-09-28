@@ -29,10 +29,10 @@
             },
             "args": [
                 "--base",
-                "configs/autoencoder/autoencoder_kl_32x32x4.yaml",
+                "configs/latent-diffusion/vs.yaml",
                 "-t",
                 "--gpus",
-                "0",
+                "0,",
             ],
         },
     ]

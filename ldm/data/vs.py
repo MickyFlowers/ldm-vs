@@ -42,10 +42,7 @@ def make_dataset(dir):
 
 
 class VsDatasetBase(data.Dataset):
-    def __init__(
-        self,
-        data_root,
-    ):
+    def __init__(self, data_root):
         self.data_root = data_root
         self.flist = self.get_data_flist()
         self.processer = self.create_processer()
@@ -59,35 +56,40 @@ class VsDatasetBase(data.Dataset):
 
     def __getitem__(self, index):
         ret = {}
-        file_name = str(self.flist[index])
-
-        img = self.processer(
-            self.loader("{}/{}/{}".format(self.data_root, "img", file_name))
-        )
-        cond_image = self.processer(
-            self.loader("{}/{}/{}".format(self.data_root, "seg", file_name))
-        )
-
-        ret["image"] = img
-        ret["cond_image"] = cond_image
-        ret["path"] = file_name
+        for k, v in self.flist.items():
+            file_name = str(v[index])
+            data = self.processer(self.loader(os.path.join(self.data_root, file_name)))
+            ret[k] = data
+            ret["file"] = file_name
         return ret
 
     def __len__(self):
-        return len(self.flist)
+        return len(self.flist["image"])
 
 
 class VsDatasetTrain(VsDatasetBase):
-    def __init__(self, train_flist=None, img_size=[480, 640], **kwargs) -> None:
+    def __init__(
+        self, train_flist=None, img_size=[480, 640], seg=False, **kwargs
+    ) -> None:
         self.data_flist = train_flist
         self.img_size = img_size
-
+        self.seg = seg
         super().__init__(**kwargs)
 
     def get_data_flist(self):
         data_flist = os.path.join(self.data_root, self.data_flist)
         flist = make_dataset(data_flist)
-        return flist
+        flist_dict = {}
+        if not self.seg:
+            img_flist = [os.path.join("img", file) for file in flist]
+            seg_flist = [os.path.join("seg", file) for file in flist]
+            flist_dict["image"] = img_flist
+            flist_dict["segmentation"] = seg_flist
+        else:
+            img_flist = [os.path.join("img", file) for file in flist]
+            seg_flist = [os.path.join("seg", file) for file in flist]
+            flist_dict["image"] = seg_flist
+        return flist_dict
 
     def create_processer(self):
         tfs = torchvision.transforms.Compose(
@@ -103,16 +105,28 @@ class VsDatasetTrain(VsDatasetBase):
 
 
 class VsDatasetVal(VsDatasetBase):
-    def __init__(self, val_flist=None, img_size=[480, 640], **kwargs) -> None:
-
+    def __init__(
+        self, val_flist=None, img_size=[480, 640], seg=False, **kwargs
+    ) -> None:
         self.data_flist = val_flist
         self.img_size = img_size
+        self.seg = seg
         super().__init__(**kwargs)
 
     def get_data_flist(self):
         data_flist = os.path.join(self.data_root, self.data_flist)
         flist = make_dataset(data_flist)
-        return flist
+        flist_dict = {}
+        if not self.seg:
+            img_flist = [os.path.join("img", file) for file in flist]
+            seg_flist = [os.path.join("seg", file) for file in flist]
+            flist_dict["image"] = img_flist
+            flist_dict["segmentation"] = seg_flist
+        else:
+            img_flist = [os.path.join("img", file) for file in flist]
+            seg_flist = [os.path.join("seg", file) for file in flist]
+            flist_dict["image"] = seg_flist
+        return flist_dict
 
     def create_processer(self):
         tfs = torchvision.transforms.Compose(

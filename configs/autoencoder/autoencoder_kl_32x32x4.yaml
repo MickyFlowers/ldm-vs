@@ -1,5 +1,5 @@
 model:
-  base_learning_rate: 4.5e-6
+  base_learning_rate: 6e-6
   target: ldm.models.autoencoder.AutoencoderKL
   params:
     monitor: "val/rec_loss"
@@ -7,20 +7,20 @@ model:
     lossconfig:
       target: ldm.modules.losses.LPIPSWithDiscriminator
       params:
-        disc_start: 50001
+        disc_start: 5000
         kl_weight: 0.000001
         disc_weight: 0.5
 
     ddconfig:
       double_z: True
       z_channels: 4
-      resolution: 256
+      resolution: [480, 640]
       in_channels: 3
       out_ch: 3
       ch: 128
-      ch_mult: [ 1,2,4,4 ]  # num_down = len(ch_mult)-1
-      num_res_blocks: 2
-      attn_resolutions: [ ]
+      ch_mult: [1,2,4,8]  # num_down = len(ch_mult)-1
+      num_res_blocks: 3
+      attn_resolutions: [[60, 80]]
       dropout: 0.0
 
 data:
@@ -31,13 +31,15 @@ data:
     train:
       target: ldm.data.vs.VsDatasetTrain
       params:
+        mixed: True
         img_size: [480, 640]
-        data_root: "../data/real_world_data_4"
+        data_root: "/yuxi/data/vs/real_world_data_4"
         train_flist: "train.flist"
     validation:
       target: ldm.data.vs.VsDatasetVal
       params:
-        data_root: "../data/real_world_data_4"
+        mixed: True
+        data_root: "/yuxi/data/vs/real_world_data_4"
         img_size: [480, 640]
         val_flist: "val.flist"
 

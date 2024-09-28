@@ -259,6 +259,7 @@ class DataModuleFromConfig(pl.LightningDataModule):
             num_workers=self.num_workers,
             worker_init_fn=init_fn,
             shuffle=shuffle,
+            persistent_workers=True
         )
 
     def _predict_dataloader(self, shuffle=False):
@@ -274,6 +275,7 @@ class DataModuleFromConfig(pl.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             worker_init_fn=init_fn,
+            persistent_workers=True
         )
 
 
@@ -339,7 +341,8 @@ class SetupCallback(Callback):
 class ImageLogger(Callback):
     def __init__(
         self,
-        batch_frequency,
+        train_batch_frequency,
+        val_batch_frequency,
         max_images,
         clamp=True,
         increase_log_steps=True,
@@ -351,12 +354,14 @@ class ImageLogger(Callback):
     ):
         super().__init__()
         self.rescale = rescale
-        self.batch_freq = batch_frequency
+        self.batch_freq = train_batch_frequency
+        self.val_batch_freq = val_batch_frequency
         self.max_images = max_images
         self.logger_log_images = {
             pl.loggers.TestTubeLogger: self._testtube,
         }
         self.log_steps = [2**n for n in range(int(np.log2(self.batch_freq)) + 1)]
+        self.increase_log_steps = increase_log_steps
         if not increase_log_steps:
             self.log_steps = [self.batch_freq]
         self.clamp = clamp
@@ -364,6 +369,7 @@ class ImageLogger(Callback):
         self.log_on_batch_idx = log_on_batch_idx
         self.log_images_kwargs = log_images_kwargs if log_images_kwargs else {}
         self.log_first_step = log_first_step
+        self.validation_count = 0
 
     @rank_zero_only
     def _testtube(self, pl_module, images, batch_idx, split):
@@ -396,7 +402,9 @@ class ImageLogger(Callback):
     def log_img(self, pl_module, batch, batch_idx, split="train"):
         check_idx = batch_idx if self.log_on_batch_idx else pl_module.global_step
         if (
-            self.check_frequency(check_idx)  # batch_idx % self.batch_freq == 0
+            (
+                self.check_frequency(check_idx) or split == "val"
+            )  # batch_idx % self.batch_freq == 0
             and hasattr(pl_module, "log_images")
             and callable(pl_module.log_images)
             and self.max_images > 0
@@ -442,7 +450,8 @@ class ImageLogger(Callback):
             check_idx > 0 or self.log_first_step
         ):
             try:
-                self.log_steps.pop(0)
+                if self.increase_log_steps:
+                    self.log_steps.pop(0)
             except IndexError as e:
                 print(e)
                 pass
@@ -453,12 +462,19 @@ class ImageLogger(Callback):
         self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx
     ):
         if not self.disabled and (pl_module.global_step > 0 or self.log_first_step):
+            # print("Train: {}".format(pl_module.global_step))
             self.log_img(pl_module, batch, batch_idx, split="train")
 
     def on_validation_batch_end(
         self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx
     ):
-        if not self.disabled and pl_module.global_step > 0:
+        self.validation_count += 1
+        # print(self.validation_count)
+        if (
+            not self.disabled
+            and pl_module.global_step > 0
+            and ((self.validation_count % self.val_batch_freq) == 0)
+        ):
             self.log_img(pl_module, batch, batch_idx, split="val")
         if hasattr(pl_module, "calibrate_grad_norm"):
             if (
@@ -653,7 +669,7 @@ if __name__ == "__main__":
         if hasattr(model, "monitor"):
             print(f"Monitoring {model.monitor} as checkpoint metric.")
             default_modelckpt_cfg["params"]["monitor"] = model.monitor
-            default_modelckpt_cfg["params"]["save_top_k"] = 3
+            default_modelckpt_cfg["params"]["save_top_k"] = 1
 
         if "modelcheckpoint" in lightning_config:
             modelckpt_cfg = lightning_config.modelcheckpoint
@@ -682,7 +698,12 @@ if __name__ == "__main__":
             },
             "image_logger": {
                 "target": "main.ImageLogger",
-                "params": {"batch_frequency": 750, "max_images": 4, "clamp": True},
+                "params": {
+                    "train_batch_frequency": 750,
+                    "val_batch_frequency": 100,
+                    "max_images": 4,
+                    "clamp": True,
+                },
             },
             "learning_rate_logger": {
                 "target": "main.LearningRateMonitor",
@@ -796,7 +817,7 @@ if __name__ == "__main__":
         # run
         if opt.train:
             try:
-                trainer.fit(model, data)
+                trainer.fit(model, datamodule=data)
             except Exception:
                 melk()
                 raise
