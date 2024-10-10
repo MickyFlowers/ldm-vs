@@ -1,3 +1,5 @@
+import sys
+sys.path.append("./")
 from xlib.device.manipulator.ur_robot import UR
 from xlib.device.robotiq.robotiq_gripper import RobotiqGripper
 from xlib.device.sensor.camera import RealSenseCamera
@@ -80,5 +82,5 @@ while count < 1e4:
     )
     time.sleep(0.2)
     color_image, depth_image = camera.get_frame()
-    cv2.imwrite(f"../data/good_data/img/{count:05d}.jpg", color_image)
+    # cv2.imwrite(f"../data/good_data/img/{count:05d}.jpg", color_image)
     count += 1

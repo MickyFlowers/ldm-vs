@@ -9,10 +9,13 @@ latent_diffusion.egg-info/top_level.txt
 xlib/__init__.py
 xlib/algo/__init__.py
 xlib/algo/calibrator.py
-xlib/algo/ibvs.py
-xlib/algo/kp_matcher.py
-xlib/algo/metric.py
-xlib/algo/transforms.py
+xlib/algo/utils/__init__.py
+xlib/algo/utils/metric.py
+xlib/algo/utils/random.py
+xlib/algo/utils/transforms.py
+xlib/algo/vs/__init__.py
+xlib/algo/vs/ibvs.py
+xlib/algo/vs/kp_matcher.py
 xlib/device/__init__.py
 xlib/device/device_base/__init__.py
 xlib/device/device_base/button.py

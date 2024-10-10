@@ -9,12 +9,12 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 
 camera = RealSenseCamera()
-ur_robot = UR(ip="10.51.33.232")
+ur_robot = UR(ip="10.51.33.233")
 cali = EyeHandCalibrator(
     camera,
     ur_robot,
 )
 
 cali.setAruco()
-# cali.sampleImages("./calibration_data/right_arm")
+cali.sampleImages("./calibration_data/right_arm")
 cali.calibrate("eye-in-hand", "./calibration_data/right_arm")

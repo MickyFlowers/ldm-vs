@@ -1,13 +1,13 @@
 import sys
 
 sys.path.append("./")
-from xlib.algo.ibvs import IBVS
-from xlib.algo.kp_matcher import RomaMatchAlgo
+from xlib.algo.vs.ibvs import IBVS
+from xlib.algo.vs.kp_matcher import RomaMatchAlgo
 from xlib.device.manipulator.ur_robot import UR
 from xlib.device.robotiq import robotiq_gripper
 from xlib.device.sensor.camera import RealSenseCamera
 from xlib.sam.sam_gui import SAM
-from xlib.algo.transforms import linkVelTransform
+from xlib.algo.utils.transforms import linkVelTransform
 import xlib.log
 import logging
 import numpy as np
@@ -36,7 +36,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
     "--steps",
     type=int,
-    default=500,
+    default=200,
     help="number of ddim sampling steps",
 )
 parser.add_argument(
@@ -47,8 +47,8 @@ parser.add_argument(
 )
 opt = parser.parse_args()
 
-camera = RealSenseCamera(exposure_time=400)
-ip = "192.168.1.102"
+camera = RealSenseCamera(exposure_time=450)
+ip = "10.51.33.233"
 ur_robot = UR(ip)
 # activate gripper
 gripper = robotiq_gripper.RobotiqGripper()
@@ -64,13 +64,11 @@ if gripper_enable:
 ibvs_controller = IBVS(camera, kp_extractor=RomaMatchAlgo)
 sam = SAM()
 root_path = os.path.dirname(os.path.realpath(__file__))
-config = OmegaConf.load(
-    "logs/2024-09-21T10-17-38_vs/configs/2024-09-21T10-17-38-project.yaml"
-)
+config = OmegaConf.load("logs/2024-10-08T07-13-19-project.yaml")
 model: LatentDiffusion = instantiate_from_config(config.model)
 logging.info("Loading model...")
 model.load_state_dict(
-    torch.load("logs/2024-09-21T10-17-38_vs/checkpoints/last.ckpt")["state_dict"],
+    torch.load("logs/vs/checkpoints/epoch=000171.ckpt")["state_dict"],
     strict=True,
 )
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -78,8 +76,8 @@ model = model.to(device)
 sampler = DDIMSampler(model)
 # static variable
 logging.info("Loading tcp pose and camera2tcp...")
-tcp_pose = np.load("data/vs_examples/vs_tcp_pose.npy")
-camera2tcp = np.load("data/vs_examples/camera2tcp.npy")
+tcp_pose = np.load("data/vs_examples/extrinsic/vs_tcp_pose.npy")
+camera2tcp = np.load("data/vs_examples/extrinsic/left_camera_to_tcp.npy")
 
 while True:
     key = input("Move to initial pose?: [Y/n]")
@@ -96,8 +94,13 @@ while True:
 
     key = input("Capture image?: [Y/n]")
     if key.lower() == "y":
+        count = 0
+        while count < 30:
+            color_image, depth_image = camera.get_frame()
+            count += 1
         color_image, depth_image = camera.get_frame()
         conditioning, mask = sam.segment_img(color_image)
+        # conditioning = cv2.imread("/home/cyx/Pictures/05942.jpg")
         conditioning = transform(conditioning, device=device)
         with torch.no_grad():
             with model.ema_scope():
@@ -120,10 +123,11 @@ while True:
         logging.error("please segment the image to continue")
         exit()
     logging.info("Start Servoing...")
+
     while True:
         color_image, depth_image = camera.get_frame()
         reference_depth = np.zeros_like(depth_image)
-        reference_depth[:] = 0.3
+        reference_depth[:] = 0.2
         vel, score, match_img = ibvs_controller.cal_vel_from_img(
             reference_image, color_image, reference_depth, depth_image, mask, True
         )
