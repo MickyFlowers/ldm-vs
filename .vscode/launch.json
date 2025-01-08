@@ -29,7 +29,7 @@
             },
             "args": [
                 "--base",
-                "configs/latent-diffusion/vs.yaml",
+                "configs/latent-diffusion/dino_ddpm_single.yaml",
                 "-t",
                 "--gpus",
                 "0,",

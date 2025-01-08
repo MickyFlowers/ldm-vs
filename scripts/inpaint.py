@@ -22,7 +22,7 @@ def make_batch(image, mask, device):
     mask = torch.from_numpy(mask)
 
     masked_image = (1 - mask) * image
-
+    
     batch = {"image": image, "mask": mask, "masked_image": masked_image}
     for k in batch:
         batch[k] = batch[k].to(device=device)

@@ -67,32 +67,6 @@ model:
           attn_resolutions: [[60, 80]]
           dropout: 0.0
 
-    cond_stage_config: 
-      target: ldm.models.autoencoder.AutoencoderKL
-      params:
-        embed_dim: 8
-        monitor: val/rec_loss
-        # TODO
-        ckpt_path: logs/2024-09-22T12-12-26_vs_seg/checkpoints/epoch=000040.ckpt
-        lossconfig:
-          target: ldm.modules.losses.LPIPSWithDiscriminator
-          params:
-            disc_start: 5000
-            kl_weight: 1
-            disc_weight: 0.5
-
-        ddconfig:
-          double_z: True
-          z_channels: 8
-          resolution: [480, 640]
-          in_channels: 3
-          out_ch: 3
-          ch: 128
-          ch_mult: [1,2,4,8]  # num_down = len(ch_mult)-1
-          num_res_blocks: 3
-          attn_resolutions: [[60, 80]]
-          dropout: 0.0
-
 
 data:
   target: main.DataModuleFromConfig
