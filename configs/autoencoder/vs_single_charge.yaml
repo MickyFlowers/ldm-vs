@@ -1,0 +1,69 @@
+model:
+  base_learning_rate: 6.0e-06
+  target: ldm.models.autoencoder.AutoencoderKL
+  params:
+    # ckpt_path: logs/2024-12-23T07-08-26_vs_random_img/checkpoints/last.ckpt
+    monitor: val/rec_loss
+    embed_dim: 8
+    lossconfig:
+      target: ldm.modules.losses.LPIPSWithDiscriminator
+      params:
+        disc_start: 50001
+        kl_weight: 0.1
+        disc_weight: 0.5
+    ddconfig:
+      double_z: true
+      z_channels: 8
+      resolution:
+      - 480
+      - 640
+      in_channels: 3
+      out_ch: 3
+      ch: 128
+      ch_mult:
+      - 1
+      - 2
+      - 4
+      - 8
+      num_res_blocks: 3
+      attn_resolutions:
+      - - 60
+        - 80
+      dropout: 0.0
+data:
+  target: main.DataModuleFromConfig
+  params:
+    num_workers: 4
+    shuffle_val_dataloader: false
+    batch_size: 16
+    wrap: true
+    train:
+      target: ldm.data.vs_random.VsRandom_charge_Dataset
+      params:
+        img_size:
+        - 480
+        - 640
+        data_root: /mnt/workspace/cyxovo/dataset/charge_data_single
+        data_flist: train_charge_single.flist
+    validation:
+      target: ldm.data.vs_random.VsRandom_charge_Dataset
+      params:
+        data_root: /mnt/workspace/cyxovo/dataset/charge_data_single
+        img_size:
+        - 480
+        - 640
+        data_flist: val_charge_single.flist
+lightning:
+  callbacks:
+    image_logger:
+      target: main.ImageLogger
+      params:
+        train_batch_frequency: 1000
+        val_batch_frequency: 500
+        max_images: 8
+        increase_log_steps: false
+  trainer:
+    benchmark: true
+    accumulate_grad_batches: 8
+    accelerator: ddp
+    gpus: 0,1

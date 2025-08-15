@@ -1,0 +1,116 @@
+model:
+  base_learning_rate: 1.0e-05
+  target: ldm.models.diffusion.dino_ddpm.DinoLatentDiffusionSingle
+  params:
+    # ckpt_path: logs/2025-07-10T01-46-20_dino_ddpm_charge/checkpoints/epoch=000097.ckpt
+    linear_start: 0.0008
+    linear_end: 0.012
+    log_every_t: 100
+    timesteps: 1000
+    loss_type: l1
+    first_stage_key: image
+    cond_stage_key: segmentation
+    image_size:
+    - 60
+    - 80
+    channels: 8
+    concat_mode: false
+    monitor: val/loss
+    scheduler_config:
+      target: ldm.lr_scheduler.LambdaWarmUpCosineScheduler
+      params:
+        verbosity_interval: 0
+        warm_up_steps: 200
+        max_decay_steps: 3500
+        lr_start: 0.005
+        lr_max: 0.01
+        lr_min: 0.0001
+    unet_config:
+      target: ldm.modules.diffusionmodules.openaimodel.UNetModel
+      params:
+        image_size:
+        - 60
+        - 80
+        in_channels: 8
+        out_channels: 8
+        model_channels: 128
+        attention_resolutions:
+        - 8
+        - 4
+        num_res_blocks: 3
+        channel_mult:
+        - 1
+        - 2
+        - 4
+        num_heads: 8
+        use_spatial_transformer: true
+        transformer_depth: 4
+        context_dim: 384
+        resblock_updown: true
+    first_stage_config:
+      target: ldm.models.autoencoder.AutoencoderKL
+      params:
+        embed_dim: 8
+        monitor: val/rec_loss
+        ckpt_path: logs/2025-07-21T07-55-31_vs_single_charge/checkpoints/epoch=000190.ckpt
+        lossconfig:
+          target: ldm.modules.losses.LPIPSWithDiscriminator
+          params:
+            disc_start: 50001
+            kl_weight: 1
+            disc_weight: 0.5
+        ddconfig:
+          double_z: true
+          z_channels: 8
+          resolution:
+          - 480
+          - 640
+          in_channels: 3
+          out_ch: 3
+          ch: 128
+          ch_mult:
+          - 1
+          - 2
+          - 4
+          - 8
+          num_res_blocks: 3
+          attn_resolutions:
+          - - 60
+            - 80
+          dropout: 0.0
+data:
+  target: main.DataModuleFromConfig
+  params:
+    num_workers: 2
+    batch_size: 32
+    wrap: true
+    train:
+      target: ldm.data.vs_random.ddpm_charge_single_Dataset
+      params:
+        img_size:
+        - 480
+        - 640
+        data_root: /yuxi/data/vs/charge_data_single_new
+        data_flist: train_charge_single.flist
+    validation:
+      target: ldm.data.vs_random.ddpm_charge_single_Dataset
+      params:
+        data_root: /yuxi/data/vs/charge_data_single_new
+        img_size:
+        - 480
+        - 640
+        data_flist: val_charge_single.flist
+lightning:
+  callbacks:
+    image_logger:
+      target: main.ImageLogger
+      params:
+        train_batch_frequency: 1000
+        val_batch_frequency: 500
+        max_images: 8
+        increase_log_steps: false
+  trainer:
+    benchmark: true
+    accumulate_grad_batches: 8
+    accelerator: ddp
+    gpus: 0,1
