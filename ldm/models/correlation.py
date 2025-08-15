@@ -9,7 +9,7 @@ class Correlation(nn.Module):
     def __init__(self, k, corr_confg, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.backbone = torch.hub.load(
-            "/home/cyx/.cache/torch/hub/facebookresearch_dinov2_main",
+            "/mnt/pfs/asdfe1/model/facebookresearch_dinov2_main",
             "dinov2_vits14",
             source="local",
             trust_repo=True,

@@ -538,7 +538,7 @@ class DinoWrapper(torch.nn.Module):
     def __init__(self):
         super().__init__()
         self.model = torch.hub.load(
-            "/home/cyx/.cache/torch/hub/facebookresearch_dinov2_main",
+            "/mnt/pfs/asdfe1/model/facebookresearch_dinov2_main",
             "dinov2_vits14",
             source="local",
             trust_repo=True,
@@ -612,7 +612,7 @@ class DinoLatentDiffusion(DDPM):
             self.init_from_ckpt(ckpt_path, ignore_keys, only_model=only_model)
             self.restarted_from_ckpt = True
         self.instantiate_first_stage(first_stage_config)
-        # self.position_enc = PositionalEncoding(384, n_position=5000)
+        self.position_enc = PositionalEncoding(384, n_position=5000)
 
     def make_cond_schedule(
         self,
@@ -1149,7 +1149,7 @@ class DinoLatentDiffusion(DDPM):
     def shared_step(self, batch, **kwargs):
         x, c1, c2 = self.get_input(batch, self.first_stage_key)
         c = torch.cat([c1, c2], dim=1)
-        # c = self.position_enc(c)
+        c = self.position_enc(c)
 
         loss = self(x, c)
         return loss
@@ -1743,7 +1743,7 @@ class DinoLatentDiffusion(DDPM):
             bs=N,
         )
         c = torch.cat([c1, c2], dim=1)
-        # c = self.position_enc(c)
+        c = self.position_enc(c)
         # log["origin_conditioning"] = xc
         N = min(x.shape[0], N)
         n_row = min(x.shape[0], n_row)
