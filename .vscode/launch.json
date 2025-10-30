@@ -25,14 +25,14 @@
             "program": "./main.py",
             "console": "integratedTerminal",
             "env": {
-                "CUDA_VISIBLE_DEVICES": "0"
+                "CUDA_VISIBLE_DEVICES": "0, 1"
             },
             "args": [
                 "--base",
-                "configs/latent-diffusion/dino_ddpm_single.yaml",
+                "configs/latent-diffusion/controlnet.yaml",
                 "-t",
                 "--gpus",
-                "0,",
+                "1,",
             ],
         },
     ]

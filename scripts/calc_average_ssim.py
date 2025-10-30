@@ -160,7 +160,7 @@ if __name__ == "__main__":
     device = (
         torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
     )
-    data_root = "../data/good_random_data_single"
+    data_root = "/mnt/workspace/cyxovo/dataset/good_random_data_single"
     train_data_flist = "train_vs.flist"
     test_data_flist = "val_vs.flist"
     train_dataset = VsRandomDataset(data_root, train_data_flist)
@@ -273,13 +273,16 @@ if __name__ == "__main__":
             test_average_ssim += piq.ssim(
                 x_sample, image, data_range=1, reduction="sum"
             )
-            test_average_mse += F.mse_loss(x_sample, image, reduction="sum")
-            test_average_psnr += calc_psnr(x_sample, image, reduction="sum")
+            test_average_mse += torch.mean((x_sample * 255. - image * 255.) ** 2).item()
+            test_average_psnr += calc_psnr(x_sample, image)
             pbar.set_postfix(
                 ssim=(test_average_ssim / (i + 1) / batch_size).item(),
-                mse=(test_average_mse / (i + 1) / batch_size).item(),
+                mse=(test_average_mse / (i + 1) / batch_size),
                 psnr=(test_average_psnr / (i + 1) / batch_size),
             )
+            print(f"{(test_average_ssim / (i + 1) / batch_size).item()=}")
+            print(f"{(test_average_mse / (i + 1) / batch_size)=}")
+            print(f"{(test_average_psnr / (i + 1) / batch_size)=}")
     print(f"test average ssim: {test_average_ssim / len(test_loader.dataset)}")
     print(f"test average mse: {test_average_mse / len(test_loader.dataset)}")
     print(f"test average psnr: {test_average_psnr / len(test_loader.dataset)}")

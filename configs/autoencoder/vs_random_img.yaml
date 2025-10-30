@@ -1,0 +1,70 @@
+model:
+  # base_learning_rate: 6.0e-06
+  base_learning_rate: 4.5e-06
+  target: ldm.models.autoencoder.AutoencoderKL
+  params:
+    ckpt_path: logs/pretrained_f4_KL_model.ckpt  #加载的f4ckpt，先不加预训练
+    monitor: "val/rec_loss"
+    #embed_dim: 8
+    embed_dim: 3
+    lossconfig:
+      target: ldm.modules.losses.LPIPSWithDiscriminator
+      params:
+        disc_start: 50001
+        # kl_weight: 0.001   
+        kl_weight: 0.1
+        disc_weight: 0.5
+
+    ddconfig:
+      double_z: True
+      # z_channels: 8
+      z_channels: 3
+      #resolution: [480, 640]
+      resolution: [256,256]
+      in_channels: 3
+      out_ch: 3
+      ch: 128
+      # ch_mult: [1,2,4,8]  # num_down = len(ch_mult)-1
+      ch_mult: [1,2,4]  # num_down = len(ch_mult)-1
+      #num_res_blocks: 3
+      num_res_blocks: 2
+      #attn_resolutions: [[60,80]]
+      attn_resolutions: []
+      dropout: 0.0
+
+data:
+  target: main.DataModuleFromConfig
+  params:
+    num_workers: 0
+    shuffle_val_dataloader: false
+    # batch_size: 2
+    batch_size: 16
+    wrap: True
+    train:
+      target: ldm.data.vs_random.VsRandomImgDataset
+      params:
+        #img_size: [480, 640]
+        img_size: [256,256]
+        data_root: "/yuxi/data/vs"
+        data_flist: "train_img.flist"
+    validation:
+      target: ldm.data.vs_random.VsRandomImgDataset
+      params:
+        data_root: "/yuxi/data/vs"
+        #img_size: [480, 640]
+        img_size: [256,256]
+        data_flist: "val_img.flist"
+
+lightning:
+  callbacks:
+    image_logger:
+      target: main.ImageLogger
+      params:
+        train_batch_frequency: 500
+        val_batch_frequency: 100
+        max_images: 8
+        increase_log_steps: False
+
+  trainer:
+    benchmark: True
+    accumulate_grad_batches: 2

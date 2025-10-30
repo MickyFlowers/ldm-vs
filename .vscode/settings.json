@@ -11,5 +11,6 @@
     "marscode.codeCompletionPro": {
         "enableCodeCompletionPro": true
     },
-    "marscode.enableInlineCommand": true
+    "marscode.enableInlineCommand": true,
+    "ros.distro": "humble"
 }

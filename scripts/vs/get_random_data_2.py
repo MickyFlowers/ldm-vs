@@ -12,7 +12,7 @@ import numpy as np
 import cv2
 import time
 
-root_path = "../data/good_random_data_single_2"
+root_path = "/mnt/workspace/cyxovo/dataset/good_random_data_single_3"
 right_camera_to_tcp = np.load("data/vs_examples/extrinsic/right_camera_to_tcp.npy")
 left_camera_to_tcp = np.load("data/vs_examples/extrinsic/left_camera_to_tcp.npy")
 left_base_to_world = np.load("data/vs_examples/extrinsic/left_base_to_world.npy")

@@ -4,3 +4,4 @@ outputs/
 *.pyc
 *.ckpt
 *.pth
+scripts/vs/vs_single.py

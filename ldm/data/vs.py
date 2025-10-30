@@ -87,9 +87,9 @@ class VsDatasetBase(data.Dataset):
         else:
             img_file_name = str(self.flist["image"][index])
             seg_file_name = str(self.flist["segmentation"][index])
-            image = self.loader(os.path.join(self.data_root, img_file_name) + ".jpg")
+            image = self.loader(os.path.join(self.data_root, img_file_name) + ".png")
             segmentation = self.loader(
-                os.path.join(self.data_root, seg_file_name) + ".jpg"
+                os.path.join(self.data_root, seg_file_name) + ".png"
             )
             segmentation = enhance_image(segmentation)
             image = self.processer(image)
@@ -129,7 +129,7 @@ class VsDataset(VsDatasetBase):
                 torchvision.transforms.Resize((self.img_size[0], self.img_size[1])),
                 torchvision.transforms.ToTensor(),
                 torchvision.transforms.Normalize(
-                    mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
                 ),
             ]
         )

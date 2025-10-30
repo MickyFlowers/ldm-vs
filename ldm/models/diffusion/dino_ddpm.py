@@ -17,7 +17,7 @@ from functools import partial
 from tqdm import tqdm
 from torchvision.utils import make_grid
 from pytorch_lightning.utilities.distributed import rank_zero_only
-
+from ldm.models.attention.models import PositionalEncoding
 from ldm.util import (
     log_txt_as_img,
     exists,
@@ -104,6 +104,7 @@ class DDPM(pl.LightningModule):
         self.channels = channels
         self.use_positional_encodings = use_positional_encodings
         self.model = DiffusionWrapper(unet_config, conditioning_key)
+
         count_params(self.model, verbose=True)
         self.use_ema = use_ema
         if self.use_ema:
@@ -536,18 +537,24 @@ class DDPM(pl.LightningModule):
 class DinoWrapper(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self.model = torch.hub.load("/home/cyx/.cache/torch/hub/facebookresearch_dinov2_main", "dinov2_vits14", source='local').to("cuda")
+        self.model = torch.hub.load(
+            "/home/cyx/.cache/torch/hub/facebookresearch_dinov2_main",
+            "dinov2_vits14",
+            source="local",
+            trust_repo=True,
+        )
+        self.model.train()
 
     def encode(self, x):
         b, c, h, w = x.shape
         new_h = h // 14 * 14
-        new_w = w // 14 * 14
+        new_w = w // 14 * 14  #DINOv2 的 patch size 为 14，这里把输入图像的尺寸缩放为 14 的整数倍（ViT 对输入分辨率有要求）
         x = nn.functional.interpolate(x, (new_h, new_w))
         return self(x)
 
     def forward(self, x):
         feature_dict = self.model.forward_features(x)
-        return feature_dict["x_norm_patchtokens"].detach()
+        return feature_dict["x_norm_patchtokens"]
 
 
 class DinoLatentDiffusion(DDPM):
@@ -592,19 +599,19 @@ class DinoLatentDiffusion(DDPM):
             self.scale_factor = scale_factor
         else:
             self.register_buffer("scale_factor", torch.tensor(scale_factor))
-        self.instantiate_first_stage(first_stage_config)
         self.cond_stage_forward = cond_stage_forward
         self.clip_denoised = False
         self.bbox_tokenizer = None
 
         self.restarted_from_ckpt = False
+        self.cond_stage_model = DinoWrapper()
+        self.instantiate_first_stage(first_stage_config)
         if ckpt_path is not None:
             self.init_from_ckpt(ckpt_path, ignore_keys, only_model=only_model)
             self.restarted_from_ckpt = True
-        
         self.instantiate_first_stage(first_stage_config)
-        self.cond_stage_model = DinoWrapper()     
-           
+        # self.position_enc = PositionalEncoding(384, n_position=5000)
+
     def make_cond_schedule(
         self,
     ):
@@ -1140,6 +1147,8 @@ class DinoLatentDiffusion(DDPM):
     def shared_step(self, batch, **kwargs):
         x, c1, c2 = self.get_input(batch, self.first_stage_key)
         c = torch.cat([c1, c2], dim=1)
+        # c = self.position_enc(c)
+
         loss = self(x, c)
         return loss
 
@@ -1199,8 +1208,10 @@ class DinoLatentDiffusion(DDPM):
             z_list = [z[:, :, :, :, i] for i in range(z.shape[-1])]
 
             if (
-                self.cond_stage_key1 in ["image", "LR_image", "segmentation", "reference"]
-                and self.cond_stage_key2 in ["image", "LR_image", "segmentation", "reference"]
+                self.cond_stage_key1
+                in ["image", "LR_image", "segmentation", "reference"]
+                and self.cond_stage_key2
+                in ["image", "LR_image", "segmentation", "reference"]
                 and self.model.conditioning_key
             ):  # todo check for completeness
                 c_key = next(iter(cond.keys()))  # get key
@@ -1215,7 +1226,10 @@ class DinoLatentDiffusion(DDPM):
 
                 cond_list = [{c_key: [c[:, :, :, :, i]]} for i in range(c.shape[-1])]
 
-            elif self.cond_stage_key1 == "coordinates_bbox" or self.cond_stage_key2 == "coordinates_bbox":
+            elif (
+                self.cond_stage_key1 == "coordinates_bbox"
+                or self.cond_stage_key2 == "coordinates_bbox"
+            ):
                 assert (
                     "original_image_size" in self.split_input_params
                 ), "BoudingBoxRescaling is missing original_image_size"
@@ -1727,29 +1741,23 @@ class DinoLatentDiffusion(DDPM):
             bs=N,
         )
         c = torch.cat([c1, c2], dim=1)
+        # c = self.position_enc(c)
         # log["origin_conditioning"] = xc
         N = min(x.shape[0], N)
         n_row = min(x.shape[0], n_row)
         log["inputs"] = x
         log["reconstruction"] = xrec
-        if self.model.conditioning_key is not None:
-            if hasattr(self.cond_stage_model, "decode"):
-                xc1 = self.cond_stage_model.decode(c1)
-                xc2 = self.first_stage_model.decode(c2)
 
-                log["conditioning_peg"] = xc1
-                log["conditioning_ref"] = xc2
-
-            # elif self.cond_stage_key in ["caption"]:
-            #     xc = log_txt_as_img((x.shape[2], x.shape[3]), batch["caption"])
-            #     log["conditioning"] = xc
-            # elif self.cond_stage_key == "class_label":
-            #     xc = log_txt_as_img((x.shape[2], x.shape[3]), batch["human_label"])
-            #     log["conditioning"] = xc
-            # elif isimage(xc):
-            #     log["conditioning"] = xc
-            # if ismap(xc):
-            #     log["original_conditioning"] = self.to_rgb(xc)
+        # elif self.cond_stage_key in ["caption"]:
+        #     xc = log_txt_as_img((x.shape[2], x.shape[3]), batch["caption"])
+        #     log["conditioning"] = xc
+        # elif self.cond_stage_key == "class_label":
+        #     xc = log_txt_as_img((x.shape[2], x.shape[3]), batch["human_label"])
+        #     log["conditioning"] = xc
+        # elif isimage(xc):
+        #     log["conditioning"] = xc
+        # if ismap(xc):
+        #     log["original_conditioning"] = self.to_rgb(xc)
 
         if plot_diffusion_rows:
             # get diffusion row
@@ -1782,6 +1790,7 @@ class DinoLatentDiffusion(DDPM):
                 # samples, z_denoise_row = self.sample(cond=c, batch_size=N, return_intermediates=True)
             x_samples = self.decode_first_stage(samples)
             log["samples"] = x_samples
+            log["error"] = torch.abs(x_samples - x) - 1.0
             if plot_denoise_rows:
                 denoise_grid = self._get_denoise_row_from_list(z_denoise_row)
                 log["denoise_row"] = denoise_grid
@@ -1950,8 +1959,6 @@ class Layout2ImgDiffusion(DinoLatentDiffusion):
         logs["bbox_image"] = cond_img
         return logs
 
-
-
     """main class"""
 
     def __init__(
@@ -2002,10 +2009,10 @@ class Layout2ImgDiffusion(DinoLatentDiffusion):
         if ckpt_path is not None:
             self.init_from_ckpt(ckpt_path, ignore_keys, only_model=only_model)
             self.restarted_from_ckpt = True
-        
+
         self.instantiate_first_stage(first_stage_config)
-        self.cond_stage_model = DinoWrapper()     
-           
+        self.cond_stage_model = DinoWrapper()
+
     def make_cond_schedule(
         self,
     ):
@@ -2600,8 +2607,10 @@ class Layout2ImgDiffusion(DinoLatentDiffusion):
             z_list = [z[:, :, :, :, i] for i in range(z.shape[-1])]
 
             if (
-                self.cond_stage_key1 in ["image", "LR_image", "segmentation", "reference"]
-                and self.cond_stage_key2 in ["image", "LR_image", "segmentation", "reference"]
+                self.cond_stage_key1
+                in ["image", "LR_image", "segmentation", "reference"]
+                and self.cond_stage_key2
+                in ["image", "LR_image", "segmentation", "reference"]
                 and self.model.conditioning_key
             ):  # todo check for completeness
                 c_key = next(iter(cond.keys()))  # get key
@@ -2616,7 +2625,10 @@ class Layout2ImgDiffusion(DinoLatentDiffusion):
 
                 cond_list = [{c_key: [c[:, :, :, :, i]]} for i in range(c.shape[-1])]
 
-            elif self.cond_stage_key1 == "coordinates_bbox" or self.cond_stage_key2 == "coordinates_bbox":
+            elif (
+                self.cond_stage_key1 == "coordinates_bbox"
+                or self.cond_stage_key2 == "coordinates_bbox"
+            ):
                 assert (
                     "original_image_size" in self.split_input_params
                 ), "BoudingBoxRescaling is missing original_image_size"
@@ -3296,6 +3308,7 @@ class Layout2ImgDiffusion(DinoLatentDiffusion):
         x = 2.0 * (x - x.min()) / (x.max() - x.min()) - 1.0
         return x
 
+
 class DinoLatentDiffusionSingle(DDPM):
     """main class"""
 
@@ -3350,10 +3363,10 @@ class DinoLatentDiffusionSingle(DDPM):
         if ckpt_path is not None:
             self.init_from_ckpt(ckpt_path, ignore_keys, only_model=only_model)
             self.restarted_from_ckpt = True
-        
+
         self.instantiate_first_stage(first_stage_config)
         # self.instantiate_cond_stage(cond_stage_config)
-        
+
     def make_cond_schedule(
         self,
     ):
@@ -4622,4 +4635,3 @@ class DinoLatentDiffusionSingle(DDPM):
         x = nn.functional.conv2d(x, weight=self.colorize)
         x = 2.0 * (x - x.min()) / (x.max() - x.min()) - 1.0
         return x
-

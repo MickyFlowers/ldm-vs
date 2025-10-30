@@ -112,7 +112,8 @@ class VsRandomDataset(data.Dataset):
         return ret
 
     def __len__(self):
-        return len(self.flist)
+        return 1
+        # return len(self.flist)
 
 
 class VsCondDataset(data.Dataset):

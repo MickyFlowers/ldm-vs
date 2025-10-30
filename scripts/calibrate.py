@@ -9,7 +9,8 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 
 camera = RealSenseCamera()
-ur_robot = UR(ip="10.51.33.233")
+# exit()
+ur_robot = UR(ip="172.16.8.33")
 cali = EyeHandCalibrator(
     camera,
     ur_robot,

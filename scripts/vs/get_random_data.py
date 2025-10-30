@@ -41,7 +41,7 @@ if key.lower() == "y":
     left_gripper.activate()
 
 left_arm_pose = np.eye(4)
-left_arm_pose[:3, 3] = np.array([-1.51300577e-02, 5.15169458e-01, 4.43593506e-01])
+left_arm_pose[:3, 3] = np.array([-1.51300577e-02, 5.15169458e-01, 4.35093506e-01])
 left_arm_pose[:3, :3] = R.from_euler("XYZ", [np.pi, 0, -np.pi / 2]).as_matrix()
 start_right_camera_pose = np.eye(4)
 start_right_camera_pose[:3, 3] = np.array([0.3, 0.6, 0.4])
@@ -50,10 +50,8 @@ start_right_camera_pose[:3, :3] = R.from_euler(
 ).as_matrix()
 jnt_error = [0, 0, 0, 0, 0, 0]
 jnt_error[2] = np.pi / 180 * 3.5
-right_robot.moveToWorldErrorPose(
-    start_right_camera_pose, np.array(jnt_error), vel=1.0, acc=1.0
-)
 left_robot.moveToWorldPose(left_arm_pose, 0.1, 0.1)
+right_robot.moveToWorldPose(start_right_camera_pose, vel=0.5, acc=0.5)
 if enable_gripper:
     key = input("Close gripper? (y/n): ")
     if key.lower() == "y":
@@ -66,11 +64,11 @@ if enable_gripper:
 
 in_hand_error_pos_lower = [-0.01, -0.02, -0.03]
 in_hand_error_pos_upper = [0.01, 0.0, 0.02]
-in_hand_error_rot_lower = [-45, -10, -40]
-in_hand_error_rot_upper = [-20, 10, 30]
+in_hand_error_rot_lower = [-45, -10, -20]
+in_hand_error_rot_upper = [-20, 10, 20]
 
 left_arm_error_pos_lower = np.array([-0.03, -0.06, -0.03])
-left_arm_error_pos_upper = np.array([0.03, 0.06, 0.005])
+left_arm_error_pos_upper = np.array([0.03, 0.06, 0.0])
 left_arm_error_rot_lower = np.array([-15, -15, -15])
 left_arm_error_rot_upper = np.array([15, 15, 15])
 
@@ -91,7 +89,7 @@ start_niuniu_pose = start_object_pose @ niuniu_to_tip
 for i in range(5):
     color_image, depth_image = camera.get_frame()
 
-for i in range(71, 100):
+for i in range(200, 400):
     left_arm_error_pos = np.random.uniform(
         left_arm_error_pos_lower, left_arm_error_pos_upper
     )
@@ -106,9 +104,9 @@ for i in range(71, 100):
     cur_niuniu_pose = start_niuniu_pose @ left_arm_error_trans_matrix
     cur_object_pose = cur_niuniu_pose @ np.linalg.inv(niuniu_to_tip)
     cur_left_arm_pose = cur_object_pose @ np.linalg.inv(tip_to_tcp)
-    left_robot.moveToWorldPose(cur_left_arm_pose, vel=1.0, acc=1.0, asynchronous=False)
+    left_robot.moveToWorldPose(cur_left_arm_pose, vel=1.0, acc=1.0, asynchronous=True)
     count = 0
-    while count < 50:
+    while count < 5:
         in_hand_error_pos = np.random.uniform(
             in_hand_error_pos_lower, in_hand_error_pos_upper
         )
@@ -131,24 +129,18 @@ for i in range(71, 100):
         right_robot.moveToWorldPose(
             right_camera_pose, vel=1.0, acc=1.0, asynchronous=False
         )
-        success = right_robot.moveToWorldErrorPose(
-            right_camera_pose, np.array(jnt_error), vel=3.0, acc=5.0, asynchronous=False
-        )
         time.sleep(0.2)
-        if success:
-            color_image, depth_image = camera.get_frame()
-            cv2.imwrite(
-                f"../data/good_random_data_single/img/{i:03d}-{count:03d}.jpg",
-                color_image,
-            )
-            count += 1
-        else:
-            print("Failed")
 
-    right_robot.moveToWorldErrorPose(
-        start_right_camera_pose,
-        np.array(jnt_error),
-        vel=2.0,
-        acc=3.0,
-        asynchronous=False,
-    )
+        color_image, depth_image = camera.get_frame()
+        cv2.imwrite(
+            f"/mnt/workspace/cyxovo/dataset/good_random_data_single_3/img/{i:03d}-{count:03d}.jpg",
+            color_image,
+        )
+        count += 1
+
+    # right_robot.moveToWorldPose(
+    #     start_right_camera_pose,
+    #     vel=1.0,
+    #     acc=1.0,
+    #     asynchronous=False,
+    # )
