@@ -56,11 +56,12 @@ parser.add_argument(
 )
 
 opt = parser.parse_args()
-camera = RealSenseCamera(exposure_time=500)
+camera = RealSenseCamera(exposure_time=650,serial_number='f1421776')
 # camera.set_param(camera.fx/640.0*256.0, camera.fy/480.0*256.0,camera.cx/640.0*256.0,camera.cy/480.0*256.0)
 if not opt.image_only:
-    ip = "172.16.10.33"
-    ur_robot = UR(ip)
+    ip = "172.16.8.33"
+    left_base_to_world = np.load("data/vs_examples/extrinsic/left_base_to_world.npy")
+    ur_robot = UR(ip, left_base_to_world)
     # activate gripper
     gripper = robotiq_gripper.RobotiqGripper()
     gripper.connect(ip, 63352)
@@ -75,37 +76,19 @@ use_roma = True
 ibvs_controller = IBVS(camera, kp_algo=KpMatchAlgo, match_threshold=0.4)
 roma_ibvs_controller = IBVS(camera, kp_algo=RomaMatchAlgo)
 sam = SAM()
-root_path = os.path.dirname(os.path.realpath(__file__))
 
-
-# config = OmegaConf.load(
-#     "logs/dino_Dec_19_20_26/configs/2024-12-18T09-31-31-project.yaml"
-# )
-
-
-config = OmegaConf.load("logs/2025-01-14-dino-ddpm/configs/2025-01-14T12-18-48-project.yaml")
+config = OmegaConf.load("logs/2025-08-15T17-55-08_screwdriver-m/configs/2025-08-15T17-55-08-project.yaml")
 id = "031-001"
-# input_reference = cv2.imread(
-#    f"/home/cyx/project/data/good_random_data_single/img/{id}.jpg"
-# )
-input_reference = cv2.imread("data/vs_examples/reference.png")
-# input_reference = cv2.resize(input_reference, (256, 256), interpolation=cv2.INTER_AREA)
-# cv2.imshow("input_reference", input_reference)
-# cv2.waitKey(0)
-# model: LatentDiffusion2 = instantiate_from_config(config.model)
+
+input_reference = cv2.imread("data/vs_examples/vs_finetune.jpg")
+
 
 model:DinoLatentDiffusion=instantiate_from_config(config.model)
 logging.info("Loading model...")
 
 
-# model.load_state_dict(
-#     torch.load("logs/dino_Dec_19_20_26/checkpoints/epoch=000011.ckpt")[
-#         "state_dict"
-#     ],
-#     strict=True,
-# )
 model.load_state_dict(
-    torch.load("logs/2025-01-14-dino-ddpm/checkpoints/epoch=000480.ckpt")[
+    torch.load("logs/2025-08-15T17-55-08_screwdriver-m/checkpoints/epoch=000063.ckpt")[
         "state_dict"
     ],
     strict=True,
@@ -117,7 +100,9 @@ sampler = DDIMSampler(model)
 # static variable
 logging.info("Loading tcp pose and camera2tcp...")
 tcp_pose = np.load("data/vs_examples/extrinsic/vs_tcp_pose.npy")
-camera2tcp = np.load("calibration_data/right_arm/result/camera2tcp.npy")
+
+
+camera2tcp = np.load("calibration_data/left_arm/result/camera2tcp.npy")
 input_reference = transform(input_reference, device=device)
 
 while True:
@@ -133,8 +118,21 @@ while True:
         key = input("Close gripper?: [Y/n]")
         if key.lower() == "y":
             gripper.move_and_wait_for_pos(255, 255, 100)
-
+    
     key = input("Capture image?: [Y/n]")
+    if key.lower() == "n":
+        # 获取当前世界坐标系下的位姿
+        current_world_pose = ur_robot.world_pose
+
+        # 计算目标位姿（向下移动 2cm）
+        target_world_pose = current_world_pose.copy()
+        target_world_pose[2, 3] -= 0.15  # 沿世界坐标系的 -Z 方向移动 2cm
+
+        # 设置运动参数
+        speed = 0.1  # m/s
+        acceleration = 0.1  # m/s²
+        ur_robot.moveToWorldPose(target_world_pose, speed, acceleration)
+        
     if key.lower() == "y":
         count = 0
         if not opt.image_only:
@@ -147,8 +145,9 @@ while True:
         # )
         
         # color_image = cv2.resize(color_image, (256, 256), interpolation=cv2.INTER_AREA)
-        conditioning, mask = sam.segment_img(color_image)
-        # conditioning = cv2.imread("/home/cyx/Pictures/05942.jpg")
+        
+        conditioning, mask, _ , _ = sam.segment_img(color_image)
+        # conditioning = cv2.imread("/mnt/workspace/cyxovo/dataset/finetune_data/seg/000-000.jpg")
         conditioning = transform(conditioning, device=device)
         
         
@@ -194,39 +193,23 @@ while True:
             
                 # reference_image = cv2.resize(reference_image, (640, 480), interpolation=cv2.INTER_AREA)
                 
-                cv2.imshow("reference_image", reference_image)
-                cv2.waitKey(0)
+                # cv2.imshow("reference_image", reference_image)
+                # cv2.waitKey(0)
                 
-                
-                _, mask_background = sam.segment_img(reference_image)
+                _, mask,_ ,_ = sam.segment_img(reference_image)
+                _, mask_background,_,_ = sam.segment_img(reference_image)
                 print(mask_background.shape)
                 mask[mask_background == True] = True
                 
-    else:
-        logging.error("please segment the image to continue")
-        exit()
+    # else:
+    #     logging.error("please segment the image to continue")
+    #     exit()
     logging.info("Start Servoing...")
     use_roma = True
     
     while True:
         color_image, depth_image = camera.get_frame()
-        # conditioning = np.zeros_like(color_image)
-        # conditioning[mask] = color_image[mask]
-        # conditioning = transform(conditioning, device=device)
-        # with torch.no_grad():
-        #     with model.ema_scope():
-        #         c = model.cond_stage_model.encode(conditioning).mode()
-        #         sample, _ = sampler.sample(
-        #             S=opt.steps,
-        #             conditioning=c,
-        #             batch_size=c.shape[0],
-        #             shape=c.shape[1:],
-        #             verbose=False,
-        #             x_T=torch.zeros(c.shape, device=device),
-        #         )05, -2.4658421e-03], dtype=float3
-        #         reference_image = cv2.cvtColor(reference_image, cv2.COLOR_RGB2BGR)
-        #         reference_image = reference_image.astype(np.uint8)
-        
+
         # # 将480x640的color_image缩放为256x256
         # color_image = cv2.resize(color_image, (256, 256), interpolation=cv2.INTER_AREA)
         # # 对depth_image进行相同的缩放
@@ -240,7 +223,6 @@ while True:
             roma_ibvs_controller.update(
                 cur_img=color_image,
                 tar_img=reference_image,
-
                 cur_depth=depth_image,
                 tar_depth=reference_depth,
             )
@@ -258,9 +240,9 @@ while True:
             use_roma = True
         vel = linkVelTransform(vel, camera2tcp)
         if use_roma:
-            ur_robot.applyTcpVel(vel * 0.15)
+            ur_robot.applyTcpVel(vel * 0.2)
         else:
-            ur_robot.applyTcpVel(vel * 0.15)
+            ur_robot.applyTcpVel(vel * 0.2)
         cv2.imshow("match_img", match_img)
         if cv2.waitKey(1) & 0xFF == ord("q"):
             ur_robot.stop()

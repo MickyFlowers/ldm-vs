@@ -1,4 +1,5 @@
 import sys
+import os
 
 sys.path.append("./")
 from xlib.device.manipulator.ur_robot import UR
@@ -11,7 +12,15 @@ import cv2
 import time
 
 right_camera_to_tcp = np.load("data/vs_examples/extrinsic/right_camera_to_tcp.npy")
-left_camera_to_tcp = np.load("data/vs_examples/extrinsic/left_camera_to_tcp.npy")
+# left_camera_to_tcp = np.load("data/vs_examples/extrinsic/left_camera_to_tcp.npy")
+left_camera_to_tcp = np.array(
+    [
+        [0.99984127, 0.01763296, -0.00255244, -0.00197546],
+        [-0.01766463, 0.99975986, -0.01296848, -0.08533614],
+        [0.00232316, 0.01301151, 0.99991265, 0.06571628],
+        [0.0, 0.0, 0.0, 1.0],
+    ]
+)
 left_base_to_world = np.load("data/vs_examples/extrinsic/left_base_to_world.npy")
 right_base_to_world = np.load("data/vs_examples/extrinsic/right_base_to_world.npy")
 # print(left_base_to_world)
@@ -20,14 +29,15 @@ right_base_to_world = np.load("data/vs_examples/extrinsic/right_base_to_world.np
 enable_gripper = False
 
 left_ip = "172.16.11.33"
-right_ip = "172.16.11.111"
+right_ip = "172.16.11.68"
 
 # print(left_base_to_world)
 left_robot = UR(left_ip, left_base_to_world)
 right_robot = UR(right_ip, right_base_to_world)
-l515_serial_number = "f1421776"
+# l515_serial_number = "f1421776"
+f0210907_serial_number = "f0210907"
 d435i_serial_number = "233622071298"
-camera = RealSenseCamera(exposure_time=500, serail_number=l515_serial_number)
+camera = RealSenseCamera(exposure_time=800, serial_number=f0210907_serial_number)
 
 # print(left_robot.world_pose)
 # print(right_robot.world_pose)
@@ -41,7 +51,7 @@ if key.lower() == "y":
     left_gripper.activate()
 
 left_arm_pose = np.eye(4)
-left_arm_pose[:3, 3] = np.array([-1.51300577e-02, 5.15169458e-01, 4.35093506e-01])
+left_arm_pose[:3, 3] = np.array([1.17860298e-02, 5.98540814e-01, 4.03842954e-01])
 left_arm_pose[:3, :3] = R.from_euler("XYZ", [np.pi, 0, -np.pi / 2]).as_matrix()
 start_right_camera_pose = np.eye(4)
 start_right_camera_pose[:3, 3] = np.array([0.3, 0.6, 0.4])
@@ -51,45 +61,47 @@ start_right_camera_pose[:3, :3] = R.from_euler(
 jnt_error = [0, 0, 0, 0, 0, 0]
 jnt_error[2] = np.pi / 180 * 3.5
 left_robot.moveToWorldPose(left_arm_pose, 0.1, 0.1)
-right_robot.moveToWorldPose(start_right_camera_pose, vel=0.5, acc=0.5)
+# right_robot.moveToWorldPose(start_right_camera_pose, vel=0.5, acc=0.5)
+
+
 if enable_gripper:
     key = input("Close gripper? (y/n): ")
     if key.lower() == "y":
         left_gripper.move_and_wait_for_pos(255, 255, 100)
 
-# in_hand_error_pos_lower = [0.0, -0.02, -0.03]
-# in_hand_error_pos_upper = [0.0, -0.02, -0.03]
-# in_hand_error_rot_lower = [-20, 0.0, 0.0]
-# in_hand_error_rot_upper = [-20, 0.0, 0.0]
+in_hand_error_pos_lower = [0.0, 0.0, 0.0]
+in_hand_error_pos_upper = [0.0, 0.0, 0.0]
+in_hand_error_rot_lower = [-30.0, 0.0, 0.0]
+in_hand_error_rot_upper = [-30.0, 0.0, 0.0]
 
-in_hand_error_pos_lower = [-0.01, -0.02, -0.03]
-in_hand_error_pos_upper = [0.01, 0.0, 0.02]
-in_hand_error_rot_lower = [-45, -10, -20]
-in_hand_error_rot_upper = [-20, 10, 20]
+# in_hand_error_pos_lower = [-0.01, -0.02, -0.03]
+# in_hand_error_pos_upper = [0.01, 0.0, 0.02]
+# in_hand_error_rot_lower = [-45, -10, -20]
+# in_hand_error_rot_upper = [-20, 10, 20]
 
-left_arm_error_pos_lower = np.array([-0.03, -0.06, -0.03])
-left_arm_error_pos_upper = np.array([0.03, 0.06, 0.0])
-left_arm_error_rot_lower = np.array([-15, -15, -15])
-left_arm_error_rot_upper = np.array([15, 15, 15])
 
-# left_arm_error_pos_lower = np.array([0.0, 0.06, 0.015])
-# left_arm_error_pos_upper = np.array([0.0, 0.06, 0.015])
-# left_arm_error_pos_lower = np.array([0.0, -0.1, -0.05])
-# left_arm_error_pos_upper = np.array([0.0, 0.05, 0.0])
-# left_arm_error_rot_lower = np.array([0, 0, 0])
-# left_arm_error_rot_upper = np.array([0, 0, 0])
+# change the left
+# left_arm_error_pos_lower = np.array([-0.005, -0.005, -0.005])
+# left_arm_error_pos_upper = np.array([0.005, 0.005, 0.005])
+# left_arm_error_rot_lower = np.array([-5, -5, -5])
+# left_arm_error_rot_upper = np.array([5, 5, 5])
+left_arm_error_pos_lower = np.array([0.0, 0.0, 0.0])
+left_arm_error_pos_upper = np.array([0.0, 0.0, 0.0])
+left_arm_error_rot_lower = np.array([0.0, 0.0, 0.0])
+left_arm_error_rot_upper = np.array([0.0, 0.0, 0.0])
+
 
 tip_to_tcp = np.eye(4)
-tip_to_tcp[2, 3] = 0.16
+tip_to_tcp[2, 3] = 0.18
 
 niuniu_to_tip = np.eye(4)
-niuniu_to_tip[2, 3] = 0.15
+niuniu_to_tip[2, 3] = 0.18
 start_object_pose = left_arm_pose @ tip_to_tcp
 start_niuniu_pose = start_object_pose @ niuniu_to_tip
 for i in range(5):
     color_image, depth_image = camera.get_frame()
-
-for i in range(200, 400):
+# count big  i small
+for i in range(0, 200):
     left_arm_error_pos = np.random.uniform(
         left_arm_error_pos_lower, left_arm_error_pos_upper
     )
@@ -106,7 +118,7 @@ for i in range(200, 400):
     cur_left_arm_pose = cur_object_pose @ np.linalg.inv(tip_to_tcp)
     left_robot.moveToWorldPose(cur_left_arm_pose, vel=1.0, acc=1.0, asynchronous=True)
     count = 0
-    while count < 5:
+    while count < 30:
         in_hand_error_pos = np.random.uniform(
             in_hand_error_pos_lower, in_hand_error_pos_upper
         )
@@ -132,15 +144,35 @@ for i in range(200, 400):
         time.sleep(0.2)
 
         color_image, depth_image = camera.get_frame()
-        cv2.imwrite(
-            f"/mnt/workspace/cyxovo/dataset/good_random_data_single_3/img/{i:03d}-{count:03d}.jpg",
-            color_image,
-        )
-        count += 1
 
-    # right_robot.moveToWorldPose(
-    #     start_right_camera_pose,
-    #     vel=1.0,
-    #     acc=1.0,
-    #     asynchronous=False,
-    # )
+        if color_image is None:
+            print("❌ color_image 是 None，图像没有获取到！")
+        else:
+            print(
+                f"✅ color_image shape: {color_image.shape}, dtype: {color_image.dtype}"
+            )
+
+        # 确保保存目录存在
+        save_dir = "/mnt/workspace/cyxovo/dataset/20250912_screwdriver_m/img"
+
+        os.makedirs(save_dir, exist_ok=True)
+
+        # 构造完整文件路径
+        filename = f"{save_dir}/{i:03d}-{count:03d}.jpg"
+
+        # # 尝试保存图像
+        # success = cv2.imwrite(filename, color_image)
+        # if success:
+        #     print(f"✅ 成功保存图片: {filename}")
+        #     count += 1
+        # else:
+        #     print(f"❌ 保存失败: {filename}")
+        #     exit()
+
+
+right_robot.moveToWorldPose(
+    start_right_camera_pose,
+    vel=1.0,
+    acc=1.0,
+    asynchronous=False,
+)

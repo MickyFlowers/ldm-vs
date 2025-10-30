@@ -48,8 +48,8 @@ parser.add_argument(
 )
 opt = parser.parse_args()
 
-camera = RealSenseCamera(exposure_time=500)
-ip = "172.16.10.33"
+camera = RealSenseCamera(exposure_time=700,serial_number='f1421776')
+ip = "172.16.11.33"
 ur_robot = UR(ip)
 # activate gripper
 gripper = robotiq_gripper.RobotiqGripper()
@@ -93,7 +93,7 @@ sampler = DDIMSampler(model)
 # static variable
 logging.info("Loading tcp pose and camera2tcp...")
 tcp_pose = np.load("data/vs_examples/extrinsic/vs_tcp_pose.npy")
-camera2tcp = np.load("calibration_data/right_arm/result/camera2tcp.npy")
+camera2tcp = np.load("calibration_data/left_arm/result/camera2tcp.npy")
 # camera2tcp = np.load("data/vs_examples/extrinsic/left_camera_to_tcp.npy")
 while True:
     key = input("Move to initial pose?: [Y/n]")
@@ -116,7 +116,7 @@ while True:
             color_image, depth_image = camera.get_frame()
             count += 1
         color_image, depth_image = camera.get_frame()
-        conditioning, mask = sam.segment_img(color_image)
+        conditioning, mask,_ ,_ = sam.segment_img(color_image)
 
         # mask_float = mask.astype(np.float32)  # True -> 1.0, False -> 0.0
         # cv2.imshow("mask", mask_float)
@@ -145,8 +145,9 @@ while True:
                 reference_image = cv2.cvtColor(reference_image, cv2.COLOR_RGB2BGR)
                 reference_image = reference_image.astype(np.uint8)
 
-                _, mask_background = sam.segment_img(reference_image)
+                _, mask_background,_,_ = sam.segment_img(reference_image)
 
+                _, mask, _, _ = sam.segment_img(reference_image)
                 mask[mask_background == True] = True
 
                 mask_end_float=mask.astype(np.float32)

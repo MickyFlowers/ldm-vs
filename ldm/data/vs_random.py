@@ -224,3 +224,37 @@ class NormVsCondDataset(data.Dataset):
 
     def __len__(self):
         return len(self.flist)
+
+
+class VsRandom_charge_Dataset(data.Dataset):
+    def __init__(self, data_root, data_flist=None, img_size=[480, 640], **kwargs):
+        super().__init__()
+        self.data_root = data_root
+        self.data_flist = data_flist
+        self.img_size = img_size
+        self.processer = torchvision.transforms.Compose(
+            [
+                torchvision.transforms.Resize((self.img_size[0], self.img_size[1])),
+                torchvision.transforms.ToTensor(),
+                torchvision.transforms.Normalize(
+                    mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]
+                ),
+            ]
+        )
+        self.loader = pil_loader
+        data_flist = os.path.join(self.data_root, self.data_flist)
+        self.flist = make_dataset(data_flist)
+
+    def __getitem__(self, index):
+        # print(f"Loading val image {index}/{len(self.flist)}: {self.flist[index]}")
+        ret = {}
+        img_index = self.flist[index]
+        filename = "img/" + img_index 
+        gt_img_file_name = os.path.join(self.data_root, filename)
+        gt_image = self.loader(gt_img_file_name)
+        gt_image = self.processer(gt_image)
+        ret["image"] = gt_image
+        return ret
+
+    def __len__(self):
+        return len(self.flist)
